@@ -1,0 +1,686 @@
+# 📁 Complete File Placement Guide - Sick Room Management System
+
+## 🎯 Project Structure Overview
+
+```
+SickRoomManagementSystem/
+│
+├── Backend/                          (ASP.NET Core Web API)
+│   ├── SickRoomAPI/
+│   │   ├── Controllers/
+│   │   ├── Models/
+│   │   ├── Services/
+│   │   ├── Helpers/
+│   │   ├── appsettings.json
+│   │   └── Program.cs
+│   └── SickRoomAPI.sln
+│
+└── Frontend/                         (React Application)
+    ├── sick-room-frontend/
+    │   ├── public/
+    │   ├── src/
+    │   │   ├── components/
+    │   │   ├── services/
+    │   │   ├── context/
+    │   │   ├── App.jsx
+    │   │   └── index.js
+    │   ├── package.json
+    │   └── tailwind.config.js
+    └── node_modules/
+```
+
+---
+
+## 🔧 BACKEND - ASP.NET Core Web API
+
+### **Step 1: Create Project Structure**
+
+Open Visual Studio 2022 → Create New Project → ASP.NET Core Web API
+
+**Project Name:** `SickRoomAPI`
+**Location:** `C:\Projects\SickRoomManagementSystem\Backend\`
+
+---
+
+### **📄 File 1: appsettings.json**
+**Location:** `Backend/SickRoomAPI/appsettings.json`
+
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=YOUR_SERVER_NAME;Database=SickRoomManagement;Trusted_Connection=True;TrustServerCertificate=True"
+  },
+  "JwtSettings": {
+    "SecretKey": "YourSuperSecretKeyForJWTTokenGeneration123!@#$%",
+    "Issuer": "SickRoomAPI",
+    "Audience": "SickRoomApp",
+    "ExpiryMinutes": 480
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*"
+}
+```
+
+**⚠️ IMPORTANT:** Replace `YOUR_SERVER_NAME` with your SQL Server instance name
+- Example: `localhost`, `.\SQLEXPRESS`, or `(localdb)\MSSQLLocalDB`
+
+---
+
+### **📄 File 2: Program.cs**
+**Location:** `Backend/SickRoomAPI/Program.cs`
+
+```csharp
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Add services to the container
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+// Add CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll",
+        policy => policy
+            .AllowAnyOrigin()
+            .AllowAnyMethod()
+            .AllowAnyHeader());
+});
+
+// Add JWT Authentication
+var jwtSettings = builder.Configuration.GetSection("JwtSettings");
+var secretKey = Encoding.UTF8.GetBytes(jwtSettings["SecretKey"]);
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = jwtSettings["Issuer"],
+        ValidAudience = jwtSettings["Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(secretKey),
+        ClockSkew = TimeSpan.Zero
+    };
+});
+
+builder.Services.AddAuthorization();
+
+var app = builder.Build();
+
+// Configure the HTTP request pipeline
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseCors("AllowAll");
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapControllers();
+
+app.Run();
+```
+
+---
+
+### **📁 Models Folder**
+**Location:** `Backend/SickRoomAPI/Models/`
+
+#### **📄 File 3: User.cs**
+**Location:** `Backend/SickRoomAPI/Models/User.cs`
+
+```csharp
+namespace SickRoomAPI.Models
+{
+    public class User
+    {
+        public int UserID { get; set; }
+        public string Username { get; set; }
+        public string FullName { get; set; }
+        public string PasswordHash { get; set; }
+        public string Role { get; set; }
+        public bool IsActive { get; set; }
+        public DateTime CreatedDate { get; set; }
+        public DateTime? LastLogin { get; set; }
+    }
+
+    public class LoginRequest
+    {
+        public string Username { get; set; }
+        public string Password { get; set; }
+    }
+
+    public class LoginResponse
+    {
+        public bool Success { get; set; }
+        public string Message { get; set; }
+        public string Token { get; set; }
+        public UserInfo User { get; set; }
+    }
+
+    public class UserInfo
+    {
+        public int UserID { get; set; }
+        public string Username { get; set; }
+        public string FullName { get; set; }
+        public string Role { get; set; }
+    }
+
+    public class CreateUserRequest
+    {
+        public string Username { get; set; }
+        public string FullName { get; set; }
+        public string Password { get; set; }
+        public string Role { get; set; }
+    }
+}
+```
+
+#### **📄 File 4: Disease.cs**
+**Location:** `Backend/SickRoomAPI/Models/Disease.cs`
+
+```csharp
+namespace SickRoomAPI.Models
+{
+    public class Disease
+    {
+        public int DiseaseID { get; set; }
+        public string DiseaseName { get; set; }
+        public bool IsActive { get; set; }
+        public List<int> MedicineIDs { get; set; } = new List<int>();
+    }
+
+    public class CreateDiseaseRequest
+    {
+        public string DiseaseName { get; set; }
+        public List<int> MedicineIDs { get; set; }
+    }
+}
+```
+
+#### **📄 File 5: Medicine.cs**
+**Location:** `Backend/SickRoomAPI/Models/Medicine.cs`
+
+```csharp
+namespace SickRoomAPI.Models
+{
+    public class Medicine
+    {
+        public int MedicineID { get; set; }
+        public string MedicineName { get; set; }
+        public string MeasurementType { get; set; }
+        public bool IsActive { get; set; }
+    }
+
+    public class CreateMedicineRequest
+    {
+        public string MedicineName { get; set; }
+        public string MeasurementType { get; set; }
+    }
+}
+```
+
+#### **📄 File 6: MedicineRecord.cs**
+**Location:** `Backend/SickRoomAPI/Models/MedicineRecord.cs`
+
+```csharp
+namespace SickRoomAPI.Models
+{
+    public class MedicineRecord
+    {
+        public int RecordID { get; set; }
+        public string EmployeeID { get; set; }
+        public string EmployeeName { get; set; }
+        public string Department { get; set; }
+        public int DiseaseID { get; set; }
+        public string DiseaseName { get; set; }
+        public int MedicineID { get; set; }
+        public string MedicineName { get; set; }
+        public int Quantity { get; set; }
+        public DateTime IssueDateTime { get; set; }
+        public int NurseID { get; set; }
+        public string NurseName { get; set; }
+        public string SpecialNotes { get; set; }
+    }
+
+    public class CreateMedicineRecordRequest
+    {
+        public string EmployeeID { get; set; }
+        public string Department { get; set; }
+        public int DiseaseID { get; set; }
+        public int MedicineID { get; set; }
+        public int Quantity { get; set; }
+        public int NurseID { get; set; }
+        public string SpecialNotes { get; set; }
+    }
+
+    public class MedicineRecordFilter
+    {
+        public string EmployeeID { get; set; }
+        public string Disease { get; set; }
+        public string Department { get; set; }
+        public DateTime? DateFrom { get; set; }
+        public DateTime? DateTo { get; set; }
+    }
+}
+```
+
+#### **📄 File 7: Employee.cs**
+**Location:** `Backend/SickRoomAPI/Models/Employee.cs`
+
+```csharp
+namespace SickRoomAPI.Models
+{
+    public class Employee
+    {
+        public string Emp_No { get; set; }
+        public string EPF_No { get; set; }
+        public string FullName { get; set; }
+        public string Department { get; set; }
+        public string Designation { get; set; }
+        public string Section { get; set; }
+    }
+}
+```
+
+---
+
+### **📁 Helpers Folder**
+**Location:** `Backend/SickRoomAPI/Helpers/`
+
+#### **📄 File 8: JwtHelper.cs**
+**Location:** `Backend/SickRoomAPI/Helpers/JwtHelper.cs`
+
+```csharp
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+using SickRoomAPI.Models;
+
+namespace SickRoomAPI.Helpers
+{
+    public class JwtHelper
+    {
+        private readonly IConfiguration _configuration;
+
+        public JwtHelper(IConfiguration configuration)
+        {
+            _configuration = configuration;
+        }
+
+        public string GenerateToken(UserInfo user)
+        {
+            var jwtSettings = _configuration.GetSection("JwtSettings");
+            var secretKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["SecretKey"]));
+            var credentials = new SigningCredentials(secretKey, SecurityAlgorithms.HmacSha256);
+
+            var claims = new[]
+            {
+                new Claim(ClaimTypes.NameIdentifier, user.UserID.ToString()),
+                new Claim(ClaimTypes.Name, user.Username),
+                new Claim("FullName", user.FullName),
+                new Claim(ClaimTypes.Role, user.Role)
+            };
+
+            var token = new JwtSecurityToken(
+                issuer: jwtSettings["Issuer"],
+                audience: jwtSettings["Audience"],
+                claims: claims,
+                expires: DateTime.Now.AddMinutes(Convert.ToDouble(jwtSettings["ExpiryMinutes"])),
+                signingCredentials: credentials
+            );
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+    }
+}
+```
+
+#### **📄 File 9: PasswordHelper.cs**
+**Location:** `Backend/SickRoomAPI/Helpers/PasswordHelper.cs`
+
+```csharp
+using System.Security.Cryptography;
+using System.Text;
+
+namespace SickRoomAPI.Helpers
+{
+    public static class PasswordHelper
+    {
+        public static string HashPassword(string password)
+        {
+            using (SHA256 sha256Hash = SHA256.Create())
+            {
+                byte[] bytes = sha256Hash.ComputeHash(Encoding.UTF8.GetBytes(password));
+                StringBuilder builder = new StringBuilder();
+                for (int i = 0; i < bytes.Length; i++)
+                {
+                    builder.Append(bytes[i].ToString("X2"));
+                }
+                return builder.ToString();
+            }
+        }
+    }
+}
+```
+
+---
+
+### **📁 Controllers Folder**
+**Location:** `Backend/SickRoomAPI/Controllers/`
+
+#### **📄 File 10: AuthController.cs**
+**Location:** `Backend/SickRoomAPI/Controllers/AuthController.cs`
+
+```csharp
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
+using SickRoomAPI.Helpers;
+using SickRoomAPI.Models;
+
+namespace SickRoomAPI.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    public class AuthController : ControllerBase
+    {
+        private readonly IConfiguration _configuration;
+
+        public AuthController(IConfiguration configuration)
+        {
+            _configuration = configuration;
+        }
+
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] LoginRequest request)
+        {
+            try
+            {
+                var passwordHash = PasswordHelper.HashPassword(request.Password);
+
+                using var connection = new SqlConnection(_configuration.GetConnectionString("DefaultConnection"));
+                await connection.OpenAsync();
+
+                var command = new SqlCommand("sp_AuthenticateUser", connection);
+                command.CommandType = System.Data.CommandType.StoredProcedure;
+                command.Parameters.AddWithValue("@Username", request.Username);
+                command.Parameters.AddWithValue("@PasswordHash", passwordHash);
+
+                using var reader = await command.ExecuteReaderAsync();
+
+                if (await reader.ReadAsync())
+                {
+                    var user = new UserInfo
+                    {
+                        UserID = reader.GetInt32(0),
+                        Username = reader.GetString(1),
+                        FullName = reader.GetString(2),
+                        Role = reader.GetString(3)
+                    };
+
+                    var jwtHelper = new JwtHelper(_configuration);
+                    var token = jwtHelper.GenerateToken(user);
+
+                    return Ok(new LoginResponse
+                    {
+                        Success = true,
+                        Message = "Login successful",
+                        Token = token,
+                        User = user
+                    });
+                }
+
+                return Unauthorized(new LoginResponse
+                {
+                    Success = false,
+                    Message = "Invalid username or password"
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Internal server error", error = ex.Message });
+            }
+        }
+    }
+}
+```
+
+#### **📄 File 11: EmployeesController.cs**
+**Location:** `Backend/SickRoomAPI/Controllers/EmployeesController.cs`
+
+```csharp
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
+using SickRoomAPI.Models;
+
+namespace SickRoomAPI.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    [Authorize]
+    public class EmployeesController : ControllerBase
+    {
+        private readonly IConfiguration _configuration;
+
+        public EmployeesController(IConfiguration configuration)
+        {
+            _configuration = configuration;
+        }
+
+        [HttpGet("{empNo}")]
+        public async Task<IActionResult> GetEmployee(string empNo)
+        {
+            try
+            {
+                using var connection = new SqlConnection(_configuration.GetConnectionString("DefaultConnection"));
+                await connection.OpenAsync();
+
+                var command = new SqlCommand("sp_GetEmployeeDetails", connection);
+                command.CommandType = System.Data.CommandType.StoredProcedure;
+                command.Parameters.AddWithValue("@EmployeeID", empNo);
+
+                using var reader = await command.ExecuteReaderAsync();
+
+                if (await reader.ReadAsync())
+                {
+                    var employee = new Employee
+                    {
+                        Emp_No = reader["Emp_No"].ToString(),
+                        EPF_No = reader["EPF_No"].ToString(),
+                        FullName = reader["FullName"].ToString(),
+                        Department = reader["Department"].ToString(),
+                        Designation = reader["Designation"]?.ToString(),
+                        Section = reader["Section"]?.ToString()
+                    };
+
+                    return Ok(new { success = true, employee });
+                }
+
+                return NotFound(new { success = false, message = "Employee not found" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Internal server error", error = ex.Message });
+            }
+        }
+    }
+}
+```
+
+#### **📄 File 12: DiseasesController.cs**
+**Location:** `Backend/SickRoomAPI/Controllers/DiseasesController.cs`
+
+```csharp
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
+using SickRoomAPI.Models;
+
+namespace SickRoomAPI.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    [Authorize]
+    public class DiseasesController : ControllerBase
+    {
+        private readonly IConfiguration _configuration;
+
+        public DiseasesController(IConfiguration configuration)
+        {
+            _configuration = configuration;
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetAll()
+        {
+            try
+            {
+                var diseases = new List<Disease>();
+
+                using var connection = new SqlConnection(_configuration.GetConnectionString("DefaultConnection"));
+                await connection.OpenAsync();
+
+                // Get all diseases
+                var command = new SqlCommand("sp_GetActiveDiseases", connection);
+                command.CommandType = System.Data.CommandType.StoredProcedure;
+
+                using var reader = await command.ExecuteReaderAsync();
+
+                while (await reader.ReadAsync())
+                {
+                    diseases.Add(new Disease
+                    {
+                        DiseaseID = reader.GetInt32(0),
+                        DiseaseName = reader.GetString(1)
+                    });
+                }
+                reader.Close();
+
+                // Get medicine IDs for each disease
+                foreach (var disease in diseases)
+                {
+                    var medicineCommand = new SqlCommand(
+                        "SELECT MedicineID FROM DiseaseMedicines WHERE DiseaseID = @DiseaseID",
+                        connection);
+                    medicineCommand.Parameters.AddWithValue("@DiseaseID", disease.DiseaseID);
+
+                    using var medicineReader = await medicineCommand.ExecuteReaderAsync();
+                    while (await medicineReader.ReadAsync())
+                    {
+                        disease.MedicineIDs.Add(medicineReader.GetInt32(0));
+                    }
+                }
+
+                return Ok(diseases);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Internal server error", error = ex.Message });
+            }
+        }
+
+        [HttpPost]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Create([FromBody] CreateDiseaseRequest request)
+        {
+            try
+            {
+                using var connection = new SqlConnection(_configuration.GetConnectionString("DefaultConnection"));
+                await connection.OpenAsync();
+
+                using var transaction = connection.BeginTransaction();
+
+                try
+                {
+                    // Insert disease
+                    var command = new SqlCommand(
+                        "INSERT INTO Diseases (DiseaseName, IsActive) VALUES (@Name, 1); SELECT SCOPE_IDENTITY();",
+                        connection, transaction);
+                    command.Parameters.AddWithValue("@Name", request.DiseaseName);
+
+                    var diseaseId = Convert.ToInt32(await command.ExecuteScalarAsync());
+
+                    // Insert disease-medicine relationships
+                    foreach (var medicineId in request.MedicineIDs)
+                    {
+                        var relCommand = new SqlCommand(
+                            "INSERT INTO DiseaseMedicines (DiseaseID, MedicineID) VALUES (@DiseaseID, @MedicineID)",
+                            connection, transaction);
+                        relCommand.Parameters.AddWithValue("@DiseaseID", diseaseId);
+                        relCommand.Parameters.AddWithValue("@MedicineID", medicineId);
+                        await relCommand.ExecuteNonQueryAsync();
+                    }
+
+                    transaction.Commit();
+                    return Ok(new { success = true, diseaseId });
+                }
+                catch
+                {
+                    transaction.Rollback();
+                    throw;
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Internal server error", error = ex.Message });
+            }
+        }
+
+        [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            try
+            {
+                using var connection = new SqlConnection(_configuration.GetConnectionString("DefaultConnection"));
+                await connection.OpenAsync();
+
+                var command = new SqlCommand(
+                    "UPDATE Diseases SET IsActive = 0 WHERE DiseaseID = @ID",
+                    connection);
+                command.Parameters.AddWithValue("@ID", id);
+
+                await command.ExecuteNonQueryAsync();
+
+                return Ok(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Internal server error", error = ex.Message });
+            }
+        }
+    }
+}
+```
+
+**Continue to next message for remaining controllers...**
+
+---
+
+## ⏭️ Next Files Coming:
+- MedicinesController.cs
+- MedicineRecordsController.cs
+- UsersController.cs
+- Frontend React files and structure
+
+Should I continue with the remaining backend controllers?
